@@ -1,0 +1,769 @@
+esphome:
+  name: livingroom-clock
+  friendly_name: livingroom_clock
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+
+# Enable logging
+logger:
+  logs:
+    component: ERROR
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret haapi_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  manual_ip:
+    static_ip: 10.0.0.106
+    gateway: 10.0.0.1
+    subnet: 255.255.255.0
+    dns1: 75.75.75.75
+    dns2: 75.75.76.76
+  
+  fast_connect: off
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Livingroom Clock Hotspot"
+    password: !secret haapi_password
+
+captive_portal:
+
+#web_server:
+#-----------------------------------------------------------------------------
+psram:
+  mode: octal
+  speed: 80MHz
+#-----------------------------------------------------------------------------
+ch422g:
+  - i2c_id: i2cbus_a
+    id: ch422g_hub
+#-----------------------------------------------------------------------------
+i2c:
+  - id: i2cbus_a
+    sda: GPIO08
+    scl: GPIO09
+    scan: True
+#-----------------------------------------------------------------------------
+switch:
+  - platform: restart
+    name: "Livingroom Clock Restart"
+#-----------------------------------------------------------------------------
+  - platform: gpio
+    name: Clock Backlight
+    id: clock_backlight_switch
+    pin:
+      ch422g: ch422g_hub
+      number: 2
+      mode:
+        output: true
+    inverted: true
+#    restore_mode: ALWAYS_OFF
+#-----------------------------------------------------------------------------
+  - platform: template
+    name: Clock Antiburn
+    id: switch_clock_antiburn
+    icon: mdi:television-shimmer
+    optimistic: true
+    entity_category: "config"
+    turn_on_action:
+      - logger.log: "Starting Clock Antiburn"
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+            - delay: 1s
+      - lvgl.pause:
+          show_snow: true
+    turn_off_action:
+      - logger.log: "Stopping Clock Antiburn"
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+#-----------------------------------------------------------------------------
+sensor:
+- platform: wifi_signal
+  name: "Clock Signal Strength"
+  update_interval: 60s
+#--------------------------------------
+- platform: homeassistant
+  id: bedroom_brightness
+  entity_id: sensor.eddys_office_ambient_light
+  state_class: measurement
+  device_class: ILLUMINANCE
+  unit_of_measurement: lx
+  on_value:
+    then:
+    - lvgl.label.update:
+        id: header_display_time
+        text:
+          format:  "%3.2f"
+          args: [ 'x' ]
+    - if:
+        condition:
+          lambda: 'return (x < (id(clock_display_threshold).state));'
+        then:
+          - switch.turn_on: clock_backlight_switch #Inverted logic - "turn_on" will turn the backlight off
+        else:
+          - switch.turn_off: clock_backlight_switch #Inverted logic - "turn_off" will turn the backlight on
+#--------------------------------------
+- platform: homeassistant
+  id: livingroom_temperature
+  entity_id: sensor.livingroom_scd30_temperature
+  unit_of_measurement: "°F"
+  state_class: measurement
+  device_class: temperature
+  internal: true
+  on_value:
+    - lvgl.label.update:
+        id: display_temperature
+        text:
+          format: "%.0f°F"
+          args: [ 'x' ]
+#--------------------------------------
+- platform: homeassistant
+  id: livingroom_humidity
+  entity_id: sensor.livingroom_scd30_humidity
+  unit_of_measurement: "%"
+  state_class: measurement
+  device_class: humidity
+  internal: true
+  on_value:
+    - lvgl.label.update:
+        id: display_humidity
+        text:
+          format:  "%.0f%%"
+          args: [ 'x' ]  
+#--------------------------------------
+- platform: homeassistant
+  id: livingroom_co2
+  entity_id: sensor.livingroom_scd30_co2
+  unit_of_measurement: "ppm"
+  state_class: measurement
+  device_class: carbon_dioxide
+  internal: true
+  on_value:
+    - lvgl.label.update:
+        id: display_co2
+        text:
+          format:  "%.0f"
+          args: [ 'x' ]  
+#--------------------------------------
+- platform: homeassistant
+  id: livingroom_PM25
+  entity_id: sensor.livingroom_pm_2_5um
+  unit_of_measurement: "µg/m³"
+  state_class: measurement
+  device_class: PM25
+  internal: true
+  on_value:
+    - lvgl.label.update:
+        id: display_pm25
+        text:
+          format:  "%.2f"
+          args: [ 'x' ]  
+#--------------------------------------
+- platform: homeassistant
+  id: livingroom_PM10
+  entity_id: sensor.livingroom_pm_10_0um
+  unit_of_measurement: "µg/m³"
+  state_class: measurement
+  device_class: PM10
+  internal: true
+  on_value:
+    - lvgl.label.update:
+        id: display_pm10
+        text:
+          format:  "%.2f"
+          args: [ 'x' ]  
+#--------------------------------------
+- platform: homeassistant
+  id: livingroom_pressure
+  entity_id: sensor.eddys_office_pressure
+  unit_of_measurement: "inHg"
+  state_class: measurement
+  device_class: PRESSURE
+  internal: true
+  on_value:
+    - lvgl.label.update:
+        id: display_pressure
+        text:
+          format:  "%.2f inHg"
+          args: [ 'x' ]
+#-----------------------------------------------------------------------------
+binary_sensor:
+  - platform: homeassistant
+    id: plant_lights
+    entity_id: switch.plant_light
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: plant_lights_button
+          state:
+            checked: !lambda return x;
+#--------------------------------------
+  - platform: homeassistant
+    id: aquarium
+    entity_id: switch.aquarium_light
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: acqu_light_button
+          state:
+            checked: !lambda return x;
+#-----------------------------------------------------------------------------
+text_sensor:
+- platform: wifi_info
+  ip_address:
+    name: Clock IP
+  ssid:
+    name: Clock SSID
+  bssid:
+    name: Clock BSSID
+  mac_address:
+    name: Clock Mac
+#--------------------------------------
+#- platform: homeassistant
+#  id: livingroom_pressure_trend
+#  entity_id: sensor.textpressuretrend
+#  internal: true
+#  on_value:
+#    - lvgl.label.update:
+#        id: display_pressure_trend
+#        text: !lambda |-
+#            return id(livingroom_pressure_trend).state.c_str();
+#-----------------------------------------------------------------------------
+time:
+  - platform: homeassistant
+    id: esptime
+    on_time_sync:
+      - script.execute: time_update
+    on_time:
+      - minutes: '*'
+        seconds: 0
+        then:
+          - script.execute: time_update
+      - hours: '10,22'
+        minutes: 0
+        seconds: 0
+        then:
+          - switch.turn_on: switch_clock_antiburn
+      - hours: '10,22'
+        minutes: 1
+        seconds: 0
+        then:
+          - switch.turn_off: switch_clock_antiburn
+          - script.execute: time_update
+#-----------------------------------------------------------------------------
+font:
+  - file: "gfonts://Concert One"
+    id: concert_40
+    size: 40
+    bpp: 4
+    extras:
+      file: "gfonts://Concert One"
+      glyphs: [
+      "µ","³",
+    ]
+
+  - file: "gfonts://Concert One"
+    id: concert_60
+    size: 60
+    bpp: 4
+    extras:
+      file: "gfonts://Concert One"
+      glyphs: [
+      "µ","³",
+    ]
+
+  - file: "gfonts://Concert One"
+    id: concert_80
+    size: 80
+    bpp: 4
+    extras:
+      file: "gfonts://Concert One"
+      glyphs: [
+      "µ","³",
+    ]
+
+  - file: "fonts/G7_Segment7_S5.ttf"
+    id: big_seven_seg
+    size: 280
+    bpp: 4
+    glyphs: [
+      "0","1","2","3","4","5","6","7","8","9","-",
+      "\u0020", #space
+      "\u003A", #colon
+      ]
+#-----------------------------------------------------------------------------
+display:
+  - platform: rpi_dpi_rgb
+    id: my_display
+    auto_clear_enabled: false
+    update_interval: never
+    color_order: RGB
+    pclk_frequency: 16MHz
+    dimensions:
+      width: 800
+      height: 480
+    reset_pin:
+      ch422g: ch422g_hub
+      number: 3
+#    enable_pin:
+#      ch422g: ch422g_hub
+#      number: 2
+    de_pin:
+      number: 5
+    hsync_pin:
+      number: 46
+      ignore_strapping_warning: true
+    vsync_pin:
+      number: 3
+      ignore_strapping_warning: true
+    pclk_pin: 7
+    pclk_inverted: false
+    hsync_back_porch: 10 #30
+    hsync_front_porch: 20 #210 
+    hsync_pulse_width: 10 #30
+    vsync_back_porch: 10 #4
+    vsync_front_porch: 10 #4
+    vsync_pulse_width: 10 #4
+    data_pins:
+      red:
+        - 1         #r3
+        - 2         #r4
+        - 42        #r5
+        - 41        #r6
+        - 40        #r7
+      blue:
+        - 14        #b3
+        - 38        #b4
+        - 18        #b5
+        - 17        #b6
+        - 10        #b7
+      green:
+        - 39        #g2
+        - 0         #g3
+        - 45        #g4
+        - 48        #g5
+        - 47        #g6
+        - 21        #g7
+#-----------------------------------------------------------------------------
+touchscreen:
+  platform: gt911
+  address: 0x5D
+  i2c_id: i2cbus_a
+  id: my_touchscreen
+  update_interval: 16ms
+  interrupt_pin: GPIO4
+  reset_pin:
+    ch422g: ch422g_hub
+    number: 1
+    mode: output
+  on_touch:
+    - switch.turn_off: clock_backlight_switch #Inverted logic - "turn_off" will turn the backlight on
+    - script.execute: time_update
+    - lvgl.resume:
+    - lvgl.widget.redraw:
+    - lambda: |-
+          ESP_LOGI("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
+              touch.x,
+              touch.y,
+              touch.x_raw,
+              touch.y_raw
+              );
+#-----------------------------------------------------------------------------
+lvgl:
+  displays:
+    - my_display
+  buffer_size: 25%
+  disp_bg_color: 0x000000
+  #-----------------------------------------------------------------------------
+  touchscreens:
+    - my_touchscreen
+#-----------------------------------------------------------------------------
+  style_definitions:
+    - id: header_footer
+      bg_color: 0x000000 #0x2F8CD8
+      bg_opa: COVER
+      border_opa: TRANSP
+      radius: 0
+      pad_all: 0
+      pad_row: 0
+      pad_column: 0
+      text_font: montserrat_28
+      border_color: 0x000000 #0x0077b3
+      text_color: 0x323AA8 #0xFFFFFF
+      width: 100%
+      height: 50
+#--------------------------------------------------------------------------------------------------
+    - id: enviro_label_style
+      grid_cell_x_align: STRETCH
+      grid_cell_y_align: CENTER
+      text_font: concert_60
+      text_color: 0x323AA8
+      text_align: CENTER
+      outline_width: 0
+      outline_color: 0xFFFF00
+#--------------------------------------------------------------------------------------------------
+    - id: button_label_style
+      align: CENTER
+      text_font: concert_80
+      text_color: 0x000000
+      text_align: CENTER
+      border_opa: TRANSP
+      outline_width: 0
+      outline_color: 0xFFFF00
+#--------------------------------------------------------------------------------------------------
+    - id: button_off_style
+      grid_cell_x_align: STRETCH
+      grid_cell_y_align: CENTER
+      border_opa: TRANSP
+      align: CENTER
+      bg_color: 0x700B15
+#--------------------------------------------------------------------------------------------------
+    - id: button_on_style
+      border_opa: TRANSP
+      align: CENTER
+      bg_color: 0x2D6E0A
+#--------------------------------------------------------------------------------------------------
+    - id: aqi_label_value_style
+      grid_cell_x_align: STRETCH
+      grid_cell_y_align: CENTER
+      text_font: concert_80
+      text_color: 0x323AA8
+      text_align: CENTER
+      outline_width: 0
+      outline_color: 0xFFFF00
+#--------------------------------------------------------------------------------------------------
+    - id: aqi_label_units_style
+      grid_cell_x_align: STRETCH
+      grid_cell_y_align: CENTER
+      text_font: concert_60
+      text_color: 0x323AA8
+      text_align: LEFT
+      text_opa: 85%
+      outline_width: 0
+      outline_color: 0xFFFF00
+#--------------------------------------------------------------------------------------------------
+    - id: aqi_label_id_style
+      grid_cell_x_align: STRETCH
+      grid_cell_y_align: CENTER
+      text_font: concert_60
+      text_color: 0x323AA8
+      text_align: RIGHT
+      text_opa: 90%
+      outline_width: 0
+      outline_color: 0xFFFF00
+#--------------------------------------------------------------------------------------------------
+  top_layer:
+    widgets:
+      - label:
+          id: header_display_time
+          styles: header_footer
+          align: top_mid
+          text: "--:--"
+          text_align: CENTER
+          text_font: concert_40
+          width: 100%
+      - buttonmatrix:
+          align: bottom_mid
+          styles: header_footer
+          pad_all: 0
+          outline_width: 0
+          id: top_layer
+          items:
+            styles: header_footer
+          rows:
+            - buttons:
+              - id: page_prev
+                text: "\uF053"
+                on_press:
+                  then:
+                    lvgl.page.previous:
+              - id: page_home
+                text: "\uF015"
+                on_press:
+                  then:
+                    lvgl.page.show: main_page
+              - id: page_next
+                text: "\uF054"
+                on_press:
+                  then:
+                    lvgl.page.next:
+  #-----------------------------------------------------------------------------
+  pages:
+    - id: main_page
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            align: CENTER
+            width: 780
+            height: 380
+            x: 0
+            y: 0
+            pad_all: 0
+            bg_opa: TRANSP
+            border_opa: TRANSP
+            outline_width: 0
+            outline_color: 0xFFFFFF
+            layout:
+              type: grid
+              grid_columns: [FR(1)]
+              grid_rows: [FR(1)]
+            widgets:
+              - label:
+                  id: display_time
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 0
+                  text: "--:--"
+                  grid_cell_x_align: STRETCH
+                  grid_cell_y_align: CENTER
+                  text_font: big_seven_seg
+                  text_color: 0x323AA8
+                  text_align: CENTER
+                  outline_width: 0
+                  outline_color: 0xFFFF00
+#--------------------------------------------------------
+    - id: livingroom_environment
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            align: CENTER
+            width: 780
+            height: 380
+            x: 0
+            y: 0
+            pad_all: 0
+            bg_opa: TRANSP
+            border_opa: TRANSP
+            outline_width: 0
+            outline_color: 0xFFFFFF
+            layout:
+              type: grid
+              grid_columns: [FR(1),FR(1)]
+              grid_rows: [FR(1),FR(1)]
+            widgets:
+#---------------------------------------
+              - label:
+                  id: display_temperature
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 0
+                  text: "--°F"
+                  styles: enviro_label_style
+#---------------------------------------
+              - label:
+                  id: display_humidity
+                  grid_cell_column_pos: 1
+                  grid_cell_row_pos: 0
+                  text: "--%"
+                  styles: enviro_label_style
+#---------------------------------------
+              - label:
+                  id: display_pressure
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 1
+                  text: "-- inHg"
+                  styles: enviro_label_style
+#---------------------------------------
+              - label:
+                  id: display_pressure_trend
+                  grid_cell_column_pos: 1
+                  grid_cell_row_pos: 1
+                  text: "--"
+                  styles: enviro_label_style
+#--------------------------------------------------------
+    - id: livingroom_aqi
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            align: CENTER
+            width: 780
+            height: 380
+            x: 0
+            y: 0
+            pad_all: 0
+            bg_opa: TRANSP
+            border_opa: TRANSP
+            outline_width: 0
+            outline_color: 0xFFFFFF
+            layout:
+              type: GRID
+              grid_columns: [FR(1), content, FR(1)]
+              grid_rows: [FR(1), FR(1), FR(1)]
+            widgets:
+#---------------------------------------
+              - label:
+                  id: display_pm25_id
+                  text: "PM 2.5 "
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 0
+                  styles: aqi_label_id_style
+#---------------------------------------
+              - label:
+                  id: display_pm25
+                  text: "--"
+                  grid_cell_column_pos: 1
+                  grid_cell_row_pos: 0
+                  styles: aqi_label_value_style
+#---------------------------------------
+              - label:
+                  id: display_pm25_units
+                  text: " µg/m³"
+                  grid_cell_column_pos: 2
+                  grid_cell_row_pos: 0
+                  styles: aqi_label_units_style
+#---------------------------------------
+              - label:
+                  id: display_pm10_id
+                  text: "PM 10 "
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 1
+                  styles: aqi_label_id_style
+#---------------------------------------
+              - label:
+                  id: display_pm10
+                  text: "--"
+                  grid_cell_column_pos: 1
+                  grid_cell_row_pos: 1
+                  styles: aqi_label_value_style
+#---------------------------------------
+              - label:
+                  id: display_pm10_units
+                  text: " µg/m³"
+                  grid_cell_column_pos: 2
+                  grid_cell_row_pos: 1
+                  styles: aqi_label_units_style
+#---------------------------------------
+              - label:
+                  id: display_co2_id
+                  text: "co2 "
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 2
+                  styles: aqi_label_id_style
+#---------------------------------------
+              - label:
+                  id: display_co2
+                  text: "--"
+                  grid_cell_column_pos: 1
+                  grid_cell_row_pos: 2
+                  styles: aqi_label_value_style
+#---------------------------------------
+              - label:
+                  id: display_co2_units
+                  text: " ppm"
+                  grid_cell_column_pos: 2
+                  grid_cell_row_pos: 2
+                  styles: aqi_label_units_style
+#--------------------------------------------------------------------------------------------------
+    - id: clock_buttons
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            align: CENTER
+            width: 780
+            height: 380
+            x: 0
+            y: 0
+            pad_all: 0
+            bg_opa: TRANSP
+            border_opa: TRANSP
+            outline_width: 0
+            outline_color: 0xFFFFFF
+            layout:
+              type: grid
+              grid_columns: [FR(1),FR(1)]
+              grid_rows: [FR(1)]
+            widgets:
+#--------------------------------------------------------------------------------------------------
+              - button:
+                  id: acqu_light_button
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 0
+                  checkable: true
+                  styles: button_off_style
+                  checked:
+                    styles: button_on_style
+                  widgets:
+                    - label:
+                        id: printer_power_button_label
+                        text: "Aquarium"
+                        styles: button_label_style
+                  on_click:
+                    - homeassistant.action:
+                        action: light.toggle
+                        data:
+                          entity_id: aquarium
+#--------------------------------------------------------------------------------------------------
+              - button:
+                  id: plant_lights_button
+                  grid_cell_column_pos: 1
+                  grid_cell_row_pos: 0
+                  checkable: true
+                  styles: button_off_style
+                  checked:
+                    styles: button_on_style
+                  widgets:
+                    - label:
+                        id: printer_lights_button_label
+                        text: "Plants"
+                        styles: button_label_style
+                  on_click:
+                    - homeassistant.action:
+                        action: light.toggle
+                        data:
+                          entity_id: plant_lights
+#--------------------------------------------------------------------------------------------------
+number:
+  - platform: template
+    name: Screen Lux Threshold
+    optimistic: true
+    id: clock_display_threshold
+    unit_of_measurement: "Lx"
+    initial_value: 5
+    restore_value: true
+    min_value: 1
+    max_value: 1000
+    step: 1
+    mode: box
+#-----------------------------------------------------------------------------
+script:
+# This script updates the time
+#snprintf(time_buf, sizeof(time_buf), "%2d:%02d%s", hour_12, now.minute, is_pm ? "pm" : "am"); // This does have the ap/pm flag
+  - id: time_update
+    then:
+      - lvgl.label.update:
+          id:
+#            - header_display_time
+            - display_time
+          text: !lambda |-
+            static char time_buf[17];
+            auto now = id(esptime).now();            
+            bool is_pm = now.hour >= 12;
+            int hour_12 = now.hour % 12;
+            if (hour_12 == 0) {
+                hour_12 = 12;
+            }
+            snprintf(time_buf, sizeof(time_buf), "%2d:%02d", hour_12, now.minute); // This does not have the ap/pm flag
+            return time_buf;
