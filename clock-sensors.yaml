@@ -1,0 +1,162 @@
+substitutions:
+  name: "clock-sensors"
+  friendly_name: Clock Sensors
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2024.6.0
+  name_add_mac_suffix: false
+  project:
+    name: esphome.web
+    version: dev
+
+esp8266:
+  board: esp01_1m
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption: 
+    key: !secret haapi_key
+
+# Allow Over-The-Air updates
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# Allow provisioning Wi-Fi via serial
+improv_serial:
+#---------------------------------------------------------------------------------------------------
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  manual_ip:
+    static_ip: 10.0.0.241
+    gateway: 10.0.0.1
+    subnet: 255.255.255.0
+    dns1: 75.75.75.75
+    dns2: 75.75.76.76
+  
+  fast_connect: off
+#-------------------------------------------------------
+# In combination with the `ap` this allows the user
+# to provision wifi credentials to the device via WiFi AP.
+captive_portal:
+#-------------------------------------------------------
+dashboard_import:
+  package_import_url: github://esphome/example-configs/esphome-web/esp8266.yaml@main
+  import_full_config: true
+
+# To have a "next url" for improv serial
+web_server:
+#---------------------------------------------------------------------------------------------------
+udp:
+  binary_sensors:
+    - clock_page_turn
+#---------------------------------------------------------------------------------------------------
+i2c:
+  sda: GPIO1 #Yellow Tx
+  scl: GPIO3 #Green Rx
+  scan: true
+  id: i2c_bus
+#---------------------------------------------------------------------------------------------------
+switch:
+  - platform: restart
+    name: "Clock Sensors Restart"
+#---------------------------------------------------------------------------------------------------
+sensor:
+  - platform: wifi_signal
+    name: "Clock Sensors Signal Strength"
+    update_interval: 60s
+#-------------------------------------------------------
+  - platform: veml7700
+    address: 0x10
+    update_interval: 60s
+    i2c_id: i2c_bus
+    ambient_light:
+      name: "Clock Sensors Ambient Light"
+      id: clock_sensor_amb_light
+      unit_of_measurement: "lx"
+      state_class: measurement
+      device_class: illuminance
+      accuracy_decimals: 2
+      filters:
+        - offset: 0 # Placeholder for offset
+        - lambda: return x * 1; # Placeholder for scaling
+#      on_value:
+#        then:
+#        - lvgl.label.update:
+#            id: display_brightness
+#            text:
+#              format:  "%3.2f"
+#              args: [ 'x' ]
+#        - if:
+#            condition:
+#              lambda: 'return (x >= id(bedroom_display_threshold).state);'
+#            then:
+#              - light.turn_on: back_light
+#            else:
+#              - light.turn_off: back_light
+    full_spectrum:
+      name: "Clock Sensors White Light"
+      id: bedroom_disp_white_light
+    infrared:
+      name: "Clock Sensors Infrared Light"
+      id: bedroom_disp_infred
+#---------------------------------------------------------------------------------------------------
+text_sensor:
+- platform: wifi_info
+  ip_address:
+    name: Clock Sensors IP
+  ssid:
+    name: Clock Sensors SSID
+  bssid:
+    name: Clock Sensors BSSID
+  mac_address:
+    name: Clock Sensors Mac
+#---------------------------------------------------------------------------------------------------
+time:
+  - platform: homeassistant
+    id: esptime
+#---------------------------------------------------------------------------------------------------
+remote_receiver:
+  filter: 25us
+  pin: 
+    number: GPIO0
+    inverted: true
+  dump: 
+  - pioneer: {}
+#---------------------------------------------------------------------------------------------------
+binary_sensor:
+  - platform: remote_receiver
+    name: "Livingroom Plant Lights"
+#   Remote Button 'B'
+    internal: true
+    on_release:
+      homeassistant.service:
+        service: switch.toggle
+        data:
+          entity_id: switch.plant_light
+    filters:
+      - delayed_off: 100ms
+    pioneer:
+      rc_code_1: 0x004A
+
+  - platform: remote_receiver
+    name: "Page Turn"
+    id: page_turn_button
+#   Remote Button 'A'
+    internal: true
+    filters:
+      - delayed_off: 100ms
+    pioneer:
+      rc_code_1: 0x0052
+
+  - platform: template
+    id: clock_page_turn
+    lambda: "return id(page_turn_button).state;"
+#---------------------------------------------------------------------------------------------------

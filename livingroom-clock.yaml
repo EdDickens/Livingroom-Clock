@@ -74,7 +74,7 @@ switch:
       mode:
         output: true
     inverted: true
-#    restore_mode: ALWAYS_OFF
+    restore_mode: ALWAYS_OFF
 #-----------------------------------------------------------------------------
   - platform: template
     name: Clock Antiburn
@@ -104,27 +104,6 @@ sensor:
 - platform: wifi_signal
   name: "Clock Signal Strength"
   update_interval: 60s
-#--------------------------------------
-- platform: homeassistant
-  id: bedroom_brightness
-  entity_id: sensor.eddys_office_ambient_light
-  state_class: measurement
-  device_class: ILLUMINANCE
-  unit_of_measurement: lx
-  on_value:
-    then:
-    - lvgl.label.update:
-        id: header_display_time
-        text:
-          format:  "%3.2f"
-          args: [ 'x' ]
-    - if:
-        condition:
-          lambda: 'return (x < (id(clock_display_threshold).state));'
-        then:
-          - switch.turn_on: clock_backlight_switch #Inverted logic - "turn_on" will turn the backlight off
-        else:
-          - switch.turn_off: clock_backlight_switch #Inverted logic - "turn_off" will turn the backlight on
 #--------------------------------------
 - platform: homeassistant
   id: livingroom_temperature
@@ -209,6 +188,45 @@ sensor:
         text:
           format:  "%.2f inHg"
           args: [ 'x' ]
+#-------------------------------------------------------
+- platform: veml7700
+  address: 0x10
+  update_interval: 60s
+  i2c_id: i2cbus_a
+  ambient_light:
+    name: "Clock Ambient Light"
+    id: clock_amb_light
+    unit_of_measurement: "lx"
+    state_class: measurement
+    device_class: illuminance
+    accuracy_decimals: 2
+    filters:
+      - offset: 0 # Placeholder for offset
+      - lambda: return x * 1; # Placeholder for scaling
+    on_value:
+      then:
+      - lvgl.label.update:
+          id: header_display_time
+          text:
+            format:  "%3.2f"
+            args: [ 'x' ]
+      - if:
+          condition:
+            lambda: 'return (x < (id(clock_display_threshold).state));'
+          then:
+            - switch.turn_on: clock_backlight_switch #Inverted logic - "turn_on" will turn the backlight off
+          else:
+            - switch.turn_off: clock_backlight_switch #Inverted logic - "turn_off" will turn the backlight on
+  full_spectrum:
+    name: "Clock White Light"
+    id: clock_white_light
+  infrared:
+    name: "Clock Infrared Light"
+    id: clock_infred
+#-----------------------------------------------------------------------------
+udp:
+  binary_sensors:
+    - clock_page_turn
 #-----------------------------------------------------------------------------
 binary_sensor:
   - platform: homeassistant
@@ -232,6 +250,13 @@ binary_sensor:
           id: acqu_light_button
           state:
             checked: !lambda return x;
+#--------------------------------------
+  - platform: udp
+    provider: ir-receiver
+    id: clock_page_turn
+    on_press:
+      then:
+        lvgl.page.next
 #-----------------------------------------------------------------------------
 text_sensor:
 - platform: wifi_info
@@ -275,6 +300,12 @@ time:
         then:
           - switch.turn_off: switch_clock_antiburn
           - script.execute: time_update
+#      - days_of_week: MON,TUE,WED,THU,FRI
+#        hours: 9
+#        minutes: 15
+#        seconds: 0
+#        then:
+#          - lvgl.page.show: msg_page
 #-----------------------------------------------------------------------------
 font:
   - file: "gfonts://Concert One"
@@ -306,6 +337,16 @@ font:
       glyphs: [
       "µ","³",
     ]
+
+#  - file: "gfonts://Concert One"
+#    id: concert_120
+#    size: 120
+#    bpp: 4
+#    extras:
+#      file: "gfonts://Concert One"
+#      glyphs: [
+#      "µ","³",
+#    ]
 
   - file: "fonts/G7_Segment7_S5.ttf"
     id: big_seven_seg
@@ -393,7 +434,7 @@ touchscreen:
               touch.x_raw,
               touch.y_raw
               );
-#-----------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 lvgl:
   displays:
     - my_display
@@ -417,7 +458,7 @@ lvgl:
       text_color: 0x323AA8 #0xFFFFFF
       width: 100%
       height: 50
-#--------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
     - id: enviro_label_style
       grid_cell_x_align: STRETCH
       grid_cell_y_align: CENTER
@@ -426,7 +467,7 @@ lvgl:
       text_align: CENTER
       outline_width: 0
       outline_color: 0xFFFF00
-#--------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
     - id: button_label_style
       align: CENTER
       text_font: concert_80
@@ -435,19 +476,19 @@ lvgl:
       border_opa: TRANSP
       outline_width: 0
       outline_color: 0xFFFF00
-#--------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
     - id: button_off_style
       grid_cell_x_align: STRETCH
       grid_cell_y_align: CENTER
       border_opa: TRANSP
       align: CENTER
       bg_color: 0x700B15
-#--------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
     - id: button_on_style
       border_opa: TRANSP
       align: CENTER
       bg_color: 0x2D6E0A
-#--------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
     - id: aqi_label_value_style
       grid_cell_x_align: STRETCH
       grid_cell_y_align: CENTER
@@ -456,7 +497,7 @@ lvgl:
       text_align: CENTER
       outline_width: 0
       outline_color: 0xFFFF00
-#--------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
     - id: aqi_label_units_style
       grid_cell_x_align: STRETCH
       grid_cell_y_align: CENTER
@@ -466,7 +507,7 @@ lvgl:
       text_opa: 85%
       outline_width: 0
       outline_color: 0xFFFF00
-#--------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
     - id: aqi_label_id_style
       grid_cell_x_align: STRETCH
       grid_cell_y_align: CENTER
@@ -476,7 +517,7 @@ lvgl:
       text_opa: 90%
       outline_width: 0
       outline_color: 0xFFFF00
-#--------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
   top_layer:
     widgets:
       - label:
@@ -543,6 +584,7 @@ lvgl:
                   text_font: big_seven_seg
                   text_color: 0x323AA8
                   text_align: CENTER
+                  text_opa: 100%
                   outline_width: 0
                   outline_color: 0xFFFF00
 #--------------------------------------------------------
@@ -616,63 +658,63 @@ lvgl:
 #---------------------------------------
               - label:
                   id: display_pm25_id
-                  text: "PM 2.5 "
+                  text: "PM 2.5"
                   grid_cell_column_pos: 0
                   grid_cell_row_pos: 0
                   styles: aqi_label_id_style
 #---------------------------------------
               - label:
                   id: display_pm25
-                  text: "--"
+                  text: "88.88"
                   grid_cell_column_pos: 1
                   grid_cell_row_pos: 0
                   styles: aqi_label_value_style
 #---------------------------------------
               - label:
                   id: display_pm25_units
-                  text: " µg/m³"
+                  text: "µg/m³"
                   grid_cell_column_pos: 2
                   grid_cell_row_pos: 0
                   styles: aqi_label_units_style
 #---------------------------------------
               - label:
                   id: display_pm10_id
-                  text: "PM 10 "
+                  text: "PM 10"
                   grid_cell_column_pos: 0
                   grid_cell_row_pos: 1
                   styles: aqi_label_id_style
 #---------------------------------------
               - label:
                   id: display_pm10
-                  text: "--"
+                  text: "88.88"
                   grid_cell_column_pos: 1
                   grid_cell_row_pos: 1
                   styles: aqi_label_value_style
 #---------------------------------------
               - label:
                   id: display_pm10_units
-                  text: " µg/m³"
+                  text: "µg/m³"
                   grid_cell_column_pos: 2
                   grid_cell_row_pos: 1
                   styles: aqi_label_units_style
 #---------------------------------------
               - label:
                   id: display_co2_id
-                  text: "co2 "
+                  text: "co2"
                   grid_cell_column_pos: 0
                   grid_cell_row_pos: 2
                   styles: aqi_label_id_style
 #---------------------------------------
               - label:
                   id: display_co2
-                  text: "--"
+                  text: "8888"
                   grid_cell_column_pos: 1
                   grid_cell_row_pos: 2
                   styles: aqi_label_value_style
 #---------------------------------------
               - label:
                   id: display_co2_units
-                  text: " ppm"
+                  text: "ppm"
                   grid_cell_column_pos: 2
                   grid_cell_row_pos: 2
                   styles: aqi_label_units_style
@@ -734,23 +776,96 @@ lvgl:
                         action: light.toggle
                         data:
                           entity_id: plant_lights
+#---------------------------------------------------
+#    - id: msg_page
+#      bg_color: 0x000000
+#      widgets:
+#        - obj:
+#            align: CENTER
+#            width: 780
+#            height: 380
+#            x: 0
+#            y: 0
+#            pad_all: 0
+#            bg_opa: TRANSP
+#            border_opa: TRANSP
+#            outline_width: 0
+#            outline_color: 0xFFFFFF
+#            layout:
+#              type: grid
+#              grid_columns: [FR(1)]
+#              grid_rows: [FR(1)]
+#            widgets:
+#              - label:
+#                  id: test_text
+#                  grid_cell_column_pos: 0
+#                  grid_cell_row_pos: 0
+#                  text: "Yoga Time?"
+#                  grid_cell_x_align: STRETCH
+#                  grid_cell_y_align: CENTER
+#                  text_font: concert_120
+#                  text_color: 0x323AA8
+#                  text_align: CENTER
+#                  text_opa: 100%
+#                  outline_width: 0
+#                  outline_color: 0xFFFF00
 #--------------------------------------------------------------------------------------------------
 number:
   - platform: template
     name: Screen Lux Threshold
     optimistic: true
     id: clock_display_threshold
-    unit_of_measurement: "Lx"
-    initial_value: 5
+    unit_of_measurement: "lx"
+    initial_value: 1
+    restore_value: true
+    min_value: 0.0
+    max_value: 1000
+    step: 0.1
+    mode: box
+#--------------------------------------------
+  - platform: template
+    name: Text Opacity
+    optimistic: true
+    id: clock_text_opacity
+    unit_of_measurement: "%"
+    initial_value: 100
     restore_value: true
     min_value: 1
-    max_value: 1000
+    max_value: 100
     step: 1
     mode: box
-#-----------------------------------------------------------------------------
+    on_value: 
+      then:
+        - lvgl.label.update:
+            id: 
+              - header_display_time
+              - page_prev
+              - page_home
+              - page_next
+              - display_time
+              - display_temperature
+              - display_humidity
+              - display_pressure
+              - display_pressure_trend
+              - display_pm25
+              - display_pm10
+              - display_co2
+            text_opa: !lambda return id(clock_text_opacity).state / 100 * 255;
+                      # Desired value needs to be scaled from a percent, then to a 0-255 range
+        - lvgl.label.update:
+            id: 
+              - display_pm25_id
+              - display_pm25_units
+              - display_pm10_id
+              - display_pm10_units
+              - display_co2_id
+              - display_co2_units
+            text_opa: !lambda return (id(clock_text_opacity).state - 15) / 100 * 255;
+                      # Desired value needs to be scaled from a percent, then to a 0-255 range
+#--------------------------------------------------------------------------------------------------
 script:
 # This script updates the time
-#snprintf(time_buf, sizeof(time_buf), "%2d:%02d%s", hour_12, now.minute, is_pm ? "pm" : "am"); // This does have the ap/pm flag
+#snprintf(time_buf, sizeof(time_buf), "%2d:%02d%s", hour_12, now.minute, is_pm ? "pm" : "am"); // This does have the am/pm flag
   - id: time_update
     then:
       - lvgl.label.update:
@@ -765,5 +880,5 @@ script:
             if (hour_12 == 0) {
                 hour_12 = 12;
             }
-            snprintf(time_buf, sizeof(time_buf), "%2d:%02d", hour_12, now.minute); // This does not have the ap/pm flag
+            snprintf(time_buf, sizeof(time_buf), "%2d:%02d", hour_12, now.minute); // This does not have the am/pm flag
             return time_buf;
