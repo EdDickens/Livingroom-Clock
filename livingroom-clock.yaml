@@ -177,7 +177,7 @@ sensor:
   entity_id: sensor.eddys_office_pressure
   unit_of_measurement: "inHg"
   state_class: measurement
-  device_class: pressure
+  device_class: atmospheric_pressure
   internal: true
   on_value:
     - lvgl.label.update:
@@ -185,61 +185,68 @@ sensor:
         text:
           format:  "%.2f"
           args: [ 'x' ]  
-
+#------------------------
   on_value_range: 
     - below: 29.40 # Very Low
       then:
         - lvgl.label.update:
             id: home_pressure_display
-            text_color: 0xFF0000
-
+            text_color: 0x000000
+            bg_color: 0xFF0000
+#------------------------
     - above: 29.41 # Low
       below: 29.70
       then:
         - lvgl.label.update:
             id: home_pressure_display
-            text_color: 0xFFFF00
-
+            text_color: 0x000000
+            bg_color: 0xFF8000
+#------------------------
     - above: 29.71 # A Littel Low
       below: 29.90
       then:
         - lvgl.label.update:
             id: home_pressure_display
-            text_color: 0xb603fc
-
+            text_color: 0x000000
+            bg_color: 0xFFFF00
+#------------------------
     - above: 29.91 # Normal
       below: 30.10
       then:
         - lvgl.label.update:
             id: home_pressure_display
-            text_color: 0x00FF00
-
+            text_color: 0x000000
+            bg_color: 0x00FF00
+#------------------------
     - above: 30.11 # A Little High
       below: 30.30
       then:
         - lvgl.label.update:
             id: home_pressure_display
-            text_color: 0xb603fc
-
+            text_color: 0x000000
+            bg_color: 0xFFFF00
+#------------------------
     - above: 30.31 # High
       below: 30.50
       then:
         - lvgl.label.update:
             id: home_pressure_display
-            text_color: 0xFFFF00
-
+            text_color: 0x000000
+            bg_color: 0xFF8000
+#------------------------
     - above: 30.51 # Very High
       then:
         - lvgl.label.update:
             id: home_pressure_display
-            text_color: 0xFF0000
+            text_color: 0x000000
+            bg_color: 0xFF0000
 #--------------------------------------
 - platform: homeassistant
   id: pressure_trend
   entity_id: sensor.avg_pressure_trend
   unit_of_measurement: ""
   state_class: measurement
-  device_class: humidity
+  device_class: atmospheric_pressure
   internal: true
   on_value_range: 
     - below: -0.030 #Falling Fast
@@ -248,41 +255,47 @@ sensor:
             id: home_pressure_trend
             text: $trending_down
             text_color: 0xFF0000
+#------------------------
     - above: -0.029 #Falling
       below: -0.020
       then:
         - lvgl.label.update:
             id: home_pressure_trend
             text: $trending_down
-            text_color: 0xFFFF00
+            text_color: 0xFF8000
+#------------------------
     - above: -0.019 # Slowly Falling
       below: -0.010
       then:
         - lvgl.label.update:
             id: home_pressure_trend
             text: $trending_down
-            text_color: 0xb603fc
+            text_color: 0xFFFF00
+#------------------------
     - above: -0.009 # Steady
       below: 0.010
       then:
         - lvgl.label.update:
             id: home_pressure_trend
             text: $steady
-            text_color: 0x323AA8
+            text_color: 0xFFFFFF
+#------------------------
     - above: 0.011 # Slowly Rising
       below: 0.020
       then:
         - lvgl.label.update:
             id: home_pressure_trend
             text: $trending_up
-            text_color: 0xb603fc
+            text_color: 0xFFFF00
+#------------------------
     - above: 0.021 # Rising
       below: 0.030
       then:
         - lvgl.label.update:
             id: home_pressure_trend
             text: $trending_up
-            text_color: 0xFFFF00
+            text_color: 0xFF8000
+#------------------------
     - above: 0.031 # Rising Fast
       then:
         - lvgl.label.update:
@@ -894,6 +907,10 @@ number:
               - home_pressure_trend
             text_opa: !lambda return id(clock_text_opacity).state / 100 * 255;
                       # Desired value needs to be scaled from a percent, then to a 0-255 range
+        - lvgl.label.update:
+            id: 
+              - home_pressure_display
+            bg_opa: !lambda return id(clock_text_opacity).state / 100 * 255;
 #        - lvgl.label.update:
 #            id: 
 #              - display_pm25_id
