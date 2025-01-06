@@ -4,6 +4,7 @@ substitutions:
   trending_up: "\U000F0535" # mdi:trending-up
   trending_down: "\U000F0533" # mdi:trending-up
   steady: "\U000F0534" # mdi:trending-neutral
+  Outlines: "0" # Setting to 0 will disable all Outlines.
 #---------------------------------------------------------------------------------------------------
 
 esphome:
@@ -192,7 +193,7 @@ sensor:
         - lvgl.label.update:
             id: home_pressure_display
             text_color: 0x000000
-            bg_color: 0xFF0000
+            bg_color: 0xC60000
 #------------------------
     - above: 29.41 # Low
       below: 29.70
@@ -208,7 +209,7 @@ sensor:
         - lvgl.label.update:
             id: home_pressure_display
             text_color: 0x000000
-            bg_color: 0xFFFF00
+            bg_color: 0xE6E600
 #------------------------
     - above: 29.91 # Normal
       below: 30.10
@@ -216,7 +217,7 @@ sensor:
         - lvgl.label.update:
             id: home_pressure_display
             text_color: 0x000000
-            bg_color: 0x00FF00
+            bg_color: 0x00AA00
 #------------------------
     - above: 30.11 # A Little High
       below: 30.30
@@ -224,7 +225,7 @@ sensor:
         - lvgl.label.update:
             id: home_pressure_display
             text_color: 0x000000
-            bg_color: 0xFFFF00
+            bg_color: 0xE6E600
 #------------------------
     - above: 30.31 # High
       below: 30.50
@@ -239,7 +240,7 @@ sensor:
         - lvgl.label.update:
             id: home_pressure_display
             text_color: 0x000000
-            bg_color: 0xFF0000
+            bg_color: 0xC60000
 #--------------------------------------
 - platform: homeassistant
   id: pressure_trend
@@ -323,9 +324,38 @@ sensor:
             - switch.turn_off: clock_backlight_switch
           else:
             - switch.turn_on: clock_backlight_switch
+#------------------------
+    on_value_range: 
+      - below: 1.50
+        then:
+          - number.set:
+              id: clock_text_opacity
+              value: 65
+#------------------------
+      - above: 1.51
+        below: 2.50
+        then:
+          - number.set:
+              id: clock_text_opacity
+              value: 75
+#------------------------
+      - above: 2.51
+        below: 4.00
+        then:
+          - number.set:
+              id: clock_text_opacity
+              value: 85
+#------------------------
+      - above: 4.01
+        then:
+          - number.set:
+              id: clock_text_opacity
+              value: 100
+#---------------------------------------
   full_spectrum:
     name: "${friendly_name} White Light"
     id: clock_white_light
+#---------------------------------------
   infrared:
     name: "${friendly_name} Infrared Light"
     id: clock_infred
@@ -571,14 +601,12 @@ lvgl:
       grid_cell_x_align: Stretch
       grid_cell_y_align: CENTER
       outline_color: 0xFFFF00
-      outline_width: 0
+      outline_width: ${Outlines}
       text_align: CENTER
       align: CENTER
       text_font: big_seven_seg
       border_color: 0x000000
       text_color: 0x323AA8
-      width: 99%
-      height: 95%
 #---------------------------------------------------
     - id: two_cell_style
       grid_cell_x_align: STRETCH
@@ -587,14 +615,31 @@ lvgl:
       text_color: 0x323AA8
       text_align: CENTER
       text_opa: 100%
-      bg_opa: TRANSP
+      bg_color: 0x000000
+      bg_opa: COVER
       radius: 2
       pad_all: 0
       pad_row: 0
       pad_column: 0
-      outline_width: 0
+      outline_width: ${Outlines}
       outline_color: 0xFFFF00
-      height: 160
+#---------------------------------------------------
+    - id: pressure_display_style
+      grid_cell_x_align: STRETCH
+      grid_cell_y_align: CENTER
+      text_font: two_cell
+      text_color: 0x000000
+      text_align: CENTER
+      text_opa: 100%
+      bg_color: 0x000000
+      bg_opa: 100%
+      radius: 20
+      pad_all: 0
+      pad_row: 0
+      pad_column: 0
+      outline_width: ${Outlines}
+      outline_color: 0xFF80FF
+      width: 95%
 #---------------------------------------------------
     - id: page_label_style
       grid_cell_x_align: STRETCH
@@ -606,9 +651,10 @@ lvgl:
       pad_row: 0
       pad_column: 0
       pad_all: 0
-      outline_width: 0
+      outline_width: ${Outlines}
       outline_color: 0xFFFF00
-      height: 140
+      width: 95%
+      height: 40%
 #---------------------------------------------------
     - id: footer_button
       grid_cell_x_align: Stretch
@@ -620,8 +666,9 @@ lvgl:
       pad_row: 0
       pad_column: 0
       outline_color: 0x00FF00
-      outline_width: 0
+      outline_width: ${Outlines}
 #-----------------------------------------------------------------------------
+# Day/Date display
   top_layer:
     widgets:
         - obj:
@@ -631,7 +678,7 @@ lvgl:
             pad_all: 0
             bg_opa: TRANSP
             border_opa: TRANSP
-            outline_width: 0
+            outline_width: ${Outlines}
             outline_color: 0xFF0000
             layout:
               type: grid
@@ -653,6 +700,7 @@ lvgl:
                   grid_cell_row_pos: 0
                   text_align: left
 #---------------------------------------------------
+# Navigation buttons
         - obj:
             align: bottom_mid
             width: 790
@@ -660,7 +708,7 @@ lvgl:
             pad_all: 0
             bg_opa: TRANSP
             border_opa: TRANSP
-            outline_width: 0
+            outline_width: ${Outlines}
             outline_color: 0xFF0000
             layout:
               type: grid
@@ -723,8 +771,11 @@ lvgl:
             height: 370
             bg_opa: TRANSP
             border_opa: TRANSP
-            outline_width: 0
+            outline_width: ${Outlines}
             outline_color: 0xFF0000
+            pad_all: 0
+            x: 0
+            y: 0
             layout:
               type: grid
               grid_columns: [FR(1)]
@@ -746,8 +797,9 @@ lvgl:
             height: 370
             bg_opa: TRANSP
             border_opa: TRANSP
-            outline_width: 0
+            outline_width: ${Outlines}
             outline_color: 0xFF0000
+            pad_all: 0
             x: 0
             y: 0
             layout:
@@ -786,8 +838,9 @@ lvgl:
             height: 370
             bg_opa: TRANSP
             border_opa: TRANSP
-            outline_width: 0
+            outline_width: ${Outlines}
             outline_color: 0xFF0000
+            pad_all: 0
             x: 0
             y: 0
             layout:
@@ -826,8 +879,9 @@ lvgl:
             height: 370
             bg_opa: TRANSP
             border_opa: TRANSP
-            outline_width: 0
+            outline_width: ${Outlines}
             outline_color: 0xFF0000
+            pad_all: 0
             x: 0
             y: 0
             layout:
@@ -849,7 +903,7 @@ lvgl:
                   grid_cell_column_pos: 0
                   grid_cell_row_pos: 1
                   text: "30.00"
-                  styles: two_cell_style
+                  styles: pressure_display_style
               - label:
                   id: home_pressure_trend
                   grid_cell_column_pos: 1
@@ -861,6 +915,8 @@ lvgl:
                   grid_cell_y_align: CENTER
                   align: CENTER
                   text_align: CENTER
+                  outline_width: ${Outlines}
+                  outline_color: 0xFF80FF
 #---------------------------------------------------------------------------------------------------
 number:
   - platform: template
@@ -903,7 +959,7 @@ number:
               - outdoor_temp
               - outdoor_humidity
               - pressure_enviro_label
-              - home_pressure_display
+#              - home_pressure_display
               - home_pressure_trend
             text_opa: !lambda return id(clock_text_opacity).state / 100 * 255;
                       # Desired value needs to be scaled from a percent, then to a 0-255 range
