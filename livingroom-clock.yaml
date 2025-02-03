@@ -1,9 +1,20 @@
 substitutions:
   name: "livingroom-clock"
   friendly_name: Livingroom Clock
+  
   trending_up: "\U000F0535" # mdi:trending-up
   trending_down: "\U000F0533" # mdi:trending-up
   steady: "\U000F0534" # mdi:trending-neutral
+    
+  firstquarter: "\U000F0F61" # mdi-moon-first-quarter
+  fullmoon: "\U000F0F62" # mdi-moon-full
+  lastquarter: "\U000F0F63" # mdi-moon-last-quarter
+  newmoon: "\U000F0F64" # mdi-moon-new
+  waningcrescent: "\U000F0F65" # mdi-moon-waning-crescent
+  waninggibbous: "\U000F0F66" # mdi-moon-waning-gibbous
+  waxingcrescent: "\U000F0F67" # mdi-moon-waxing-crescent
+  waxinggibbous: "\U000F0F68" # mdi-moon-waxing-gibbous
+  
   Outlines: "0" # Setting to 0 will disable all Outlines.
 #---------------------------------------------------------------------------------------------------
 
@@ -391,6 +402,92 @@ text_sensor:
     name: ${friendly_name} BSSID
   mac_address:
     name: ${friendly_name} Mac
+- platform: homeassistant
+  id: moon_phase
+  internal: true
+  entity_id: sensor.moon
+  on_value: 
+    then:
+      - if:
+          condition:
+            lambda: 'return id(moon_phase).state == "new_moon";'
+          then:
+            - lvgl.label.update:
+                id: lbl_moon_phase_glyph
+                text: "$newmoon"
+            - lvgl.label.update:
+                id: lbl_moon_phase
+                text: "New Moon"
+      - if:
+          condition:
+            lambda: 'return id(moon_phase).state == "waxing_crescent";'
+          then:
+            - lvgl.label.update:
+                id: lbl_moon_phase_glyph
+                text: "$waxingcrescent"
+            - lvgl.label.update:
+                id: lbl_moon_phase
+                text: "Waxing Cresent"
+      - if:
+          condition:
+            lambda: 'return id(moon_phase).state == "first_quarter";'
+          then:
+            - lvgl.label.update:
+                id: lbl_moon_phase_glyph
+                text: "$firstquarter"
+            - lvgl.label.update:
+                id: lbl_moon_phase
+                text: "First Quarter"
+      - if:
+          condition:
+            lambda: 'return id(moon_phase).state == "waxing_gibbous";'
+          then:
+            - lvgl.label.update:
+                id: lbl_moon_phase_glyph
+                text: "$waxinggibbous"
+            - lvgl.label.update:
+                id: lbl_moon_phase
+                text: "Waxing Gibbous"
+      - if:
+          condition:
+            lambda: 'return id(moon_phase).state == "full_moon";'
+          then:
+            - lvgl.label.update:
+                id: lbl_moon_phase_glyph
+                text: "$fullmoon"
+            - lvgl.label.update:
+                id: lbl_moon_phase
+                text: "Full Moon"
+      - if:
+          condition:
+            lambda: 'return id(moon_phase).state == "waning_gibbous";'
+          then:
+            - lvgl.label.update:
+                id: lbl_moon_phase_glyph
+                text: "$waninggibbous"
+            - lvgl.label.update:
+                id: lbl_moon_phase
+                text: "Waning Gibbous"
+      - if:
+          condition:
+            lambda: 'return id(moon_phase).state == "last_quarter";'
+          then:
+            - lvgl.label.update:
+                id: lbl_moon_phase_glyph
+                text: "$lastquarter"
+            - lvgl.label.update:
+                id: lbl_moon_phase
+                text: "Last Quarter"
+      - if:
+          condition:
+            lambda: 'return id(moon_phase).state == "waning_crescent";'
+          then:
+            - lvgl.label.update:
+                id: lbl_moon_phase_glyph
+                text: "$waningcrescent"
+            - lvgl.label.update:
+                id: lbl_moon_phase
+                text: "Waining Cresent"
 #-----------------------------------------------------------------------------
 time:
   - platform: homeassistant
@@ -455,10 +552,21 @@ font:
     size: 120
     bpp: 4
     glyphs: [
-      "0","1","2","3","4","5","6","7","8","9","-",".","%","°",
-      "F","I","n","d","o","r","O","u","t","P","e","s",
+      "P","r","e","s","u","O","t","d","o","I","n",
       "\u0020", #space
       "\u003A", #colon
+      ]
+#---------------------------------------------------
+  - file:
+      type: gfonts
+      family: Concert One
+      weight: regular
+    id: moon_phase_font
+    size: 80
+    bpp: 4
+    glyphs: [
+      "N","e","w","M","o","n","W","a","x","i","g","C","r","s","c","t","F","Q","u","G","b","l","L",
+      "\u0020", #space
       ]
 #---------------------------------------------------
   - file: "fonts/G7_Segment7_S5.ttf"
@@ -480,6 +588,21 @@ font:
       "\U000F0533", # mdi:trending-up
       "\U000F0534", # mdi:trending-neutral
       ]          
+#---------------------------------------------------
+  - file: 'fonts/materialdesignicons-webfont.ttf' # http://materialdesignicons.com/cdn/7.4.47/ 
+    id: moon_icons
+    size: 200
+    bpp: 4
+    glyphs: [
+      "\U000F0F61", # moon-first-quarter
+      "\U000F0F62", # moon-full
+      "\U000F0F63", # moon-last-quarter
+      "\U000F0F64", # moon-new
+      "\U000F0F65", # moon-waning-crescent
+      "\U000F0F66", # moon-waning-gibbous
+      "\U000F0F67", # moon-waxing-crescent
+      "\U000F0F68", # moon-waxing-gibbous
+      ]
 #-----------------------------------------------------------------------------
 display:
   - platform: rpi_dpi_rgb
@@ -924,6 +1047,50 @@ lvgl:
                   text_align: CENTER
                   outline_width: ${Outlines}
                   outline_color: 0xFF80FF
+#---------------------------------------------------
+    - id: moon_page
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            align: CENTER
+            width: 790
+            height: 370
+            bg_opa: TRANSP
+            border_opa: TRANSP
+            outline_width: ${Outlines}
+            outline_color: 0xFF0000
+            pad_all: 0
+            x: 0
+            y: 0
+            layout:
+              type: grid
+              grid_columns: [FR(1),FR(1)]
+              grid_rows: [FR(1)]
+            widgets:
+              - label:
+                  id: lbl_moon_phase_glyph
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 0
+                  text: "$newmoon"
+                  text_font: moon_icons
+                  text_color: 0x323AA8
+                  text_align: CENTER
+                  grid_cell_x_align: Stretch
+                  grid_cell_y_align: CENTER
+                  outline_color: 0xFF80FF
+                  outline_width: $Outlines
+              - label:
+                  id: lbl_moon_phase
+                  grid_cell_column_pos: 1
+                  grid_cell_row_pos: 0
+                  text: "Unknown"
+                  text_font: moon_phase_font
+                  text_color: 0x323AA8
+                  text_align: CENTER
+                  grid_cell_x_align: STRETCH
+                  grid_cell_y_align: CENTER
+                  outline_color: 0xFF80FF
+                  outline_width: $Outlines
 #---------------------------------------------------------------------------------------------------
 number:
   - platform: template
