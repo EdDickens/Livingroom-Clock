@@ -122,6 +122,29 @@ sensor:
   update_interval: 60s
 #--------------------------------------
 - platform: homeassistant
+  id: water_heater_alarm
+  entity_id: sensor.utility_room_temperature_delta_f
+  unit_of_measurement: "°F"
+  state_class: measurement
+  device_class: temperature
+  internal: true
+  on_value_range: 
+    - above: 2.51
+      then:
+        - lvgl.widget.update:
+            id:
+              - header_label
+            styles:
+              - header      
+    - below: 2.50
+      then:
+        - lvgl.widget.update:
+            id:
+              - header_label
+            styles:
+              - warning_header      
+#--------------------------------------
+- platform: homeassistant
   id: livingroom_temperature
   entity_id: sensor.livingroom_scd30_temperature
   unit_of_measurement: "°F"
@@ -395,6 +418,27 @@ text_sensor:
     name: ${friendly_name} BSSID
   mac_address:
     name: ${friendly_name} Mac
+#--------------------------------------
+- platform: homeassistant
+  id: FullTimeDate
+  entity_id: sensor.full_time_and_date
+  device_class: timestamp
+  internal: true
+  on_value:
+    - lvgl.label.update:
+        id: header_label
+        text: !lambda return id(FullTimeDate).state;
+#--------------------------------------
+- platform: homeassistant
+  id: Time12Hour
+  entity_id: sensor.12_hour_time
+  device_class: timestamp
+  internal: true
+  on_value:
+    - lvgl.label.update:
+        id: display_time
+        text: !lambda return id(Time12Hour).state;
+#---------------------------------------
 - platform: homeassistant
   id: moon_phase
   internal: true
@@ -486,29 +530,32 @@ time:
   - platform: homeassistant
     id: esptime
     on_time_sync:
-      - script.execute: time_update
-      - script.execute: date_update
+    - lvgl.label.update:
+        id: display_time
+        text: !lambda return id(Time12Hour).state;
+    - lvgl.label.update:
+        id: header_label
+        text: !lambda return id(FullTimeDate).state;
     on_time:
       - minutes: '*'
         seconds: 0
         then:
-          - script.execute: time_update
+          - lvgl.label.update:
+              id: display_time
+              text: !lambda return id(Time12Hour).state;
       - hours: '10,22'
         minutes: 0
         seconds: 0
         then:
           - switch.turn_on: switch_clock_antiburn
       - hours: '10,22'
-        minutes: 1
+        minutes: 5
         seconds: 0
         then:
           - switch.turn_off: switch_clock_antiburn
-          - script.execute: time_update
-      - hours: 0
-        minutes: 0
-        seconds: 0
-        then:
-          - script.execute: date_update
+          - lvgl.label.update:
+              id: display_time
+              text: !lambda return id(Time12Hour).state;
 #-----------------------------------------------------------------------------
 font:
   - file:
@@ -664,7 +711,12 @@ touchscreen:
     mode: output
   on_touch:
     - switch.turn_on: clock_backlight_switch
-    - script.execute: time_update
+    - lvgl.label.update:
+        id: display_time
+        text: !lambda return id(Time12Hour).state;
+    - lvgl.label.update:
+        id: header_label
+        text: !lambda return id(FullTimeDate).state;
     - lvgl.resume:
     - lvgl.widget.redraw:
     - lambda: |-
@@ -700,6 +752,22 @@ lvgl:
       text_font: concert_34
       border_color: 0x000000 #0x0077b3
       text_color: 0x323AA8
+#---------------------------------------------------
+    - id: warning_header
+      align: CENTER
+      text_align: CENTER
+      grid_cell_x_align: Stretch
+      grid_cell_y_align: CENTER
+      bg_color: 0xFF0000
+      bg_opa: COVER
+      border_opa: TRANSP
+      radius: 0
+      pad_all: 0
+      pad_row: 0
+      pad_column: 0
+      text_font: concert_34
+      border_color: 0x000000
+      text_color: 0x000000
 #---------------------------------------------------
     - id: footer
       align: CENTER
@@ -805,23 +873,16 @@ lvgl:
             outline_color: 0xFF0000
             layout:
               type: grid
-              grid_columns: [FR(1),FR(1)]
+              grid_columns: [FR(1)]
               grid_rows: [FR(1)]
             widgets:
               - label:
-                  id: day_label
+                  id: header_label
                   styles: header
-                  text: "Fri"
+                  text: "Friday Oct 31 --:--"
                   grid_cell_column_pos: 0
                   grid_cell_row_pos: 0
-                  text_align: right
-              - label:
-                  id: date_label
-                  styles: header
-                  text: "Oct 13"
-                  grid_cell_column_pos: 1
-                  grid_cell_row_pos: 0
-                  text_align: left
+                  text_align: CENTER
 #---------------------------------------------------
 # Navigation buttons
         - obj:
@@ -1113,8 +1174,7 @@ number:
       then:
         - lvgl.label.update:
             id: 
-              - day_label
-              - date_label
+              - header_label
               - page_prev
               - page_home
               - page_next
@@ -1126,7 +1186,6 @@ number:
               - outdoor_temp
               - outdoor_humidity
               - pressure_enviro_label
-#              - home_pressure_display
               - home_pressure_trend
             text_opa: !lambda return id(clock_text_opacity).state / 100 * 255;
                       # Desired value needs to be scaled from a percent, then to a 0-255 range
@@ -1141,43 +1200,6 @@ number:
                       # Desired value needs to be scaled from a percent, then to a 0-255 range
 #--------------------------------------------------------------------------------------------------
 script:
-# This script updates the time
-#            snprintf(time_buf, sizeof(time_buf), "%2d:%02d%s", hour_12, now.minute, is_pm ? "pm" : "am"); // This does have the ap/pm flag
-  - id: time_update
-    then:
-      - lvgl.label.update:
-          id:
-            - display_time
-          text: !lambda |-
-            static char time_buf[17];
-            auto now = id(esptime).now();            
-            bool is_pm = now.hour >= 12;
-            int hour_12 = now.hour % 12;
-            if (hour_12 == 0) {
-                hour_12 = 12;
-            }
-            snprintf(time_buf, sizeof(time_buf), "%2d:%02d", hour_12, now.minute); // This does NOT have the ap/pm flag
-            return time_buf;
-#---------------------------------------------------
-#This script updates the Day and Date
-  - id: date_update
-    then:
-      - lvgl.label.update:
-          id: 
-            - date_label
-          text: !lambda |-
-            static const char * const mon_names[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
-            static char date_buf[8];
-            auto now = id(esptime).now();
-            snprintf(date_buf, sizeof(date_buf), "%s %2d", mon_names[now.month-1], now.day_of_month);
-            return date_buf;
-      - lvgl.label.update:
-          id:
-            -  day_label
-          text: !lambda |-
-            static const char * const day_names[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
-            return day_names[id(esptime).now().day_of_week - 1];
-#---------------------------------------------------
 #This script returns to the main_page after 60 seconds of no page flips
   - id: return_home
     then:
