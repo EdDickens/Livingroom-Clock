@@ -394,14 +394,10 @@ sensor:
     name: "${friendly_name} Infrared Light"
     id: clock_infred
 #-----------------------------------------------------------------------------
-udp:
-  binary_sensors:
-    - clock_page_turn
-#-----------------------------------------------------------------------------
 binary_sensor:
-  - platform: udp
-    provider: ir-receiver
-    id: clock_page_turn
+  - platform: homeassistant
+    entity_id: binary_sensor.ir_receiver_livingroom_page_turn
+    id: livingroom_clock_page_turn
     on_press:
       then:
         - lvgl.page.next
