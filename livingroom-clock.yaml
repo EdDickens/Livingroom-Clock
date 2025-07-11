@@ -122,27 +122,27 @@ sensor:
   update_interval: 60s
 #--------------------------------------
 - platform: homeassistant
-  id: water_heater_alarm
-  entity_id: sensor.utility_room_temperature_delta_f
+  id: freezer_alarm
+  entity_id: sensor.utility_room_freezer_temperature_degf
   unit_of_measurement: "°F"
   state_class: measurement
   device_class: temperature
-  internal: true
+  internal: false
   on_value_range: 
-    - above: 2.51
-      then:
-        - lvgl.widget.update:
-            id:
-              - header_label
-            styles:
-              - header      
-    - below: 2.50
+    - above: 35.1
       then:
         - lvgl.widget.update:
             id:
               - header_label
             styles:
               - warning_header      
+    - below: 35.0
+      then:
+        - lvgl.widget.update:
+            id:
+              - header_label
+            styles:
+              - header      
 #--------------------------------------
 - platform: homeassistant
   id: livingroom_temperature
@@ -726,7 +726,7 @@ touchscreen:
 lvgl:
   displays:
     - my_display
-  buffer_size: 12%
+#  buffer_size: 12%
   disp_bg_color: 0x000000
   #-----------------------------------------------------------------------------
   touchscreens:
