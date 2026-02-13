@@ -56,9 +56,9 @@ ota:
 #    password: !secret web_password
 #---------------------------------------------------------------------------------------------------
 wifi:
+  min_auth_mode: wpa2
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-
   fast_connect: off
 #--------------------------------------------------------------------------------------------------
 psram:
@@ -74,6 +74,14 @@ i2c:
     sda: GPIO08
     scl: GPIO09
     scan: True
+#---------------------------------------------------------------------------------------------------
+remote_receiver:
+  filter: 50us
+  pin: 
+    number: GPIO6
+    inverted: true
+  dump:
+  - pioneer: {}
 #-----------------------------------------------------------------------------
 switch:
   - platform: restart
@@ -119,6 +127,20 @@ sensor:
 - platform: wifi_signal
   name: "${friendly_name} Signal Strength"
   update_interval: 60s
+#--------------------------------------
+#- platform: homeassistant
+#  id: ceiling_fan_brightness
+#  entity_id: light.office_ceiling_fan
+#  attribute: brightness
+#  unit_of_measurement: "%"
+#  state_class: measurement
+#  internal: true
+#  on_value:
+#    - lvgl.label.update:
+#        id: ceiling_fan_brightness_label
+#        text:
+#          format: "%.0f%%"
+#          args: [ 'x/2.55' ]
 #--------------------------------------
 - platform: homeassistant
   id: livingroom_temperature
@@ -196,7 +218,7 @@ sensor:
         - lvgl.label.update:
             id: home_pressure_display
             text_color: 0x000000
-            bg_color: 0xC60000
+            bg_color: 0xFF0000
 #------------------------
     - above: 29.41 # Low
       below: 29.70
@@ -211,7 +233,7 @@ sensor:
       then:
         - lvgl.label.update:
             id: home_pressure_display
-            text_color: 0x000000
+            text_color: 0xffffff
             bg_color: 0xE6E600
 #------------------------
     - above: 29.91 # Normal
@@ -219,7 +241,7 @@ sensor:
       then:
         - lvgl.label.update:
             id: home_pressure_display
-            text_color: 0x000000
+            text_color: 0xffffff
             bg_color: 0x00AA00
 #------------------------
     - above: 30.11 # A Little High
@@ -228,7 +250,7 @@ sensor:
         - lvgl.label.update:
             id: home_pressure_display
             text_color: 0x000000
-            bg_color: 0xE6E600
+            bg_color: 0x03fcfc
 #------------------------
     - above: 30.31 # High
       below: 30.50
@@ -236,14 +258,14 @@ sensor:
         - lvgl.label.update:
             id: home_pressure_display
             text_color: 0x000000
-            bg_color: 0xFF8000
+            bg_color: 0x0000ff
 #------------------------
     - above: 30.51 # Very High
       then:
         - lvgl.label.update:
             id: home_pressure_display
             text_color: 0x000000
-            bg_color: 0xC60000
+            bg_color: 0xae00ff
 #--------------------------------------
 - platform: homeassistant
   id: pressure_trend
@@ -274,7 +296,7 @@ sensor:
         - lvgl.label.update:
             id: home_pressure_trend
             text: $trending_down
-            text_color: 0xFFFF00
+            text_color: 0xE6E600
 #------------------------
     - above: -0.009 # Steady
       below: 0.010
@@ -290,7 +312,7 @@ sensor:
         - lvgl.label.update:
             id: home_pressure_trend
             text: $trending_up
-            text_color: 0xFFFF00
+            text_color: 0x03fcfc
 #------------------------
     - above: 0.021 # Rising
       below: 0.030
@@ -298,14 +320,14 @@ sensor:
         - lvgl.label.update:
             id: home_pressure_trend
             text: $trending_up
-            text_color: 0xFF8000
+            text_color: 0x0000ff
 #------------------------
     - above: 0.031 # Rising Fast
       then:
         - lvgl.label.update:
             id: home_pressure_trend
             text: $trending_up
-            text_color: 0xFF0000
+            text_color: 0xae00ff
 #-------------------------------------------------------
 - platform: veml7700
   address: 0x10
@@ -371,14 +393,101 @@ sensor:
     id: clock_infred
 #-----------------------------------------------------------------------------
 binary_sensor:
-  - platform: homeassistant
-    entity_id: binary_sensor.ir_receiver_livingroom_page_turn
-    id: livingroom_clock_page_turn
+  - platform: remote_receiver
+    name: "Livingroom Plant Lights - 44 Key"
+    id: living_plant_lights_44key
+#   Remote Button 'Quick'
+    internal: true
+    on_release:
+      homeassistant.service:
+        service: switch.toggle
+        data:
+          entity_id: switch.plant_light
+    filters:
+      - delayed_off: 100ms
+    pioneer:
+      rc_code_1: 0x0017
+#---------------------------------------
+  - platform: remote_receiver
+    name: "Livingroom Plant Lights"
+    id: living_plant_lights
+#   Remote Button 'B'
+    internal: true
+    on_release:
+      homeassistant.service:
+        service: switch.toggle
+        data:
+          entity_id: switch.plant_light
+    filters:
+      - delayed_off: 100ms
+    pioneer:
+      rc_code_1: 0x004A
+#---------------------------------------
+  - platform: remote_receiver
+    name: "Livingroom Page Turn - 44 Key"
+    id: livingroom_page_turn_44key
+#   Remote Button 'Slow'
+    internal: true
     on_press:
       then:
         - lvgl.page.next
         - script.stop: return_home
         - script.execute: return_home
+    filters:
+      - delayed_off: 250ms
+    pioneer:
+      rc_code_1: 0x0013
+#---------------------------------------
+  - platform: remote_receiver
+    name: "Livingroom Page Turn"
+    id: livingroom_page_turn
+#   Remote Button 'A'
+    internal: true
+    on_press:
+      then:
+        - lvgl.page.next
+        - script.stop: return_home
+        - script.execute: return_home
+    filters:
+      - delayed_off: 250ms
+    pioneer:
+      rc_code_1: 0x0052
+#---------------------------------------
+#  - platform: remote_receiver
+#    name: "Fan Lights Up"
+#   Remote Button 'Up'
+#    internal: true
+#    on_release:
+#      - homeassistant.service:
+#          service: light.turn_on
+#          data:
+#            entity_id: light.wiz_dimmable_white_37b080
+#          data_template:
+#            brightness: '{{states.light.wiz_dimmable_white_37b080.attributes.brightness + (10*2.55)}}'
+#      - script.stop: show_brightness
+#      - script.execute: show_brightness
+#    filters:
+#      - delayed_off: 100ms
+#    pioneer:
+#      rc_code_1: 0x005C
+#---------------------------------------
+#  - platform: remote_receiver
+#    name: "Fan Lights Down"
+#   Remote Button 'Down'
+#    internal: true
+#    on_release:
+#      - homeassistant.service:
+#          service: light.turn_on
+#          data:
+#            entity_id: light.wiz_dimmable_white_37b080
+#          data_template:
+#            brightness: '{{states.light.wiz_dimmable_white_37b080.attributes.brightness - (10*2.55)}}'
+#      - script.stop: show_brightness
+#      - script.execute: show_brightness
+#    filters:
+#      - delayed_off: 100ms
+#    pioneer:
+#      rc_code_1: 0x005D
 #-----------------------------------------------------------------------------
 text_sensor:
 - platform: wifi_info
@@ -564,7 +673,9 @@ font:
     size: 120
     bpp: 4
     glyphs: [
-      "P","r","e","s","u","O","t","d","o","I","n",
+      "B","P","i","g","h","r","e","s","u","O","t","d","o","I","n","a",
+      "0","1","2","3","4","5","6","7","8","9",
+      "%","-",
       "\u0020", #space
       "\u003A", #colon
       ]
@@ -1117,6 +1228,46 @@ lvgl:
                   grid_cell_y_align: CENTER
                   outline_color: 0xFF80FF
                   outline_width: $Outlines
+#---------------------------------------------------
+    - id: livingroom_lights_page
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            align: CENTER
+            width: 790
+            height: 370
+            bg_opa: TRANSP
+            border_opa: TRANSP
+            outline_width: ${Outlines}
+            outline_color: 0xFF0000
+            pad_all: 0
+            x: 0
+            y: 0
+            layout:
+              type: grid
+              grid_columns: [FR(1)]
+              grid_rows: [FR(40),FR(40),FR(20)]
+              pad_column: 0
+              pad_row: 0
+            widgets:
+              - label:
+                  id: brightness_header
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 0
+                  text: "Brightness"
+                  styles: page_label_style
+              - label:
+                  id: ceiling_fan_brightness_label
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 1
+                  text: "--%"
+                  styles: page_label_style
+              - label:
+                  id: lbl_ceilingfan_brightness_id
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 2
+                  text: "Ceiling Fan"
+                  styles: header
 #---------------------------------------------------------------------------------------------------
 number:
   - platform: template
@@ -1177,4 +1328,12 @@ script:
     then:
       - delay: 60s
       - lvgl.page.show: main_page
+#----------------------------------------
+  - id: show_brightness
+    then:
+      - lvgl.page.show:
+          id: livingroom_lights_page
+      - delay: 10s
+      - lvgl.page.show:
+          id: main_page
 #---------------------------------------------------------------------------------------------------
