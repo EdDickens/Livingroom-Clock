@@ -22,6 +22,9 @@ esphome:
   name: ${name}
   friendly_name: ${friendly_name}
   name_add_mac_suffix: false
+  project: 
+    name: mobydork.livingroom_clock
+    version: '1.0'
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -36,7 +39,7 @@ esp32:
 # Enable logging
 logger:
   logs:
-    component: ERROR
+    component: WARN
 #---------------------------------------------------------------------------------------------------
 # Enable Home Assistant API
 api:
@@ -85,10 +88,10 @@ remote_receiver:
 #-----------------------------------------------------------------------------
 switch:
   - platform: restart
-    name: "${friendly_name} Restart"
+    name: "Restart"
 #-----------------------------------------------------------------------------
   - platform: gpio
-    name: ${friendly_name} Backlight
+    name: Backlight
     id: clock_backlight_switch
     pin:
       ch422g: ch422g_hub
@@ -100,7 +103,7 @@ switch:
     restore_mode: ALWAYS_ON
 #-----------------------------------------------------------------------------
   - platform: template
-    name: ${friendly_name} Antiburn
+    name: Antiburn
     id: switch_clock_antiburn
     icon: mdi:television-shimmer
     optimistic: true
@@ -125,26 +128,57 @@ switch:
 #-----------------------------------------------------------------------------
 sensor:
 - platform: wifi_signal
-  name: "${friendly_name} Signal Strength"
+  name: "Signal Strength"
   update_interval: 60s
 #--------------------------------------
-#- platform: homeassistant
-#  id: ceiling_fan_brightness
-#  entity_id: light.office_ceiling_fan
-#  attribute: brightness
-#  unit_of_measurement: "%"
-#  state_class: measurement
-#  internal: true
-#  on_value:
-#    - lvgl.label.update:
-#        id: ceiling_fan_brightness_label
-#        text:
-#          format: "%.0f%%"
-#          args: [ 'x/2.55' ]
+- platform: homeassistant
+  id: livingroom_ceilingfan_brightness
+  entity_id: light.livingroom_fan
+  attribute: brightness
+  unit_of_measurement: "%"
+  state_class: measurement
+  internal: true
+  on_value:
+    - lvgl.label.update:
+        id: ceiling_fan_brightness_label
+        text:
+          format: "%.0f%%"
+          args: [ 'x/2.55' ]
+    - script.execute: show_ceilingfan_brightness
+#--------------------------------------
+- platform: homeassistant
+  id: livingroom_leds_brightness
+  entity_id: light.livingroom_dimmer
+  attribute: brightness
+  unit_of_measurement: "%"
+  state_class: measurement
+  internal: true
+  on_value:
+    - lvgl.label.update:
+        id: livingroom_leds_brightness_label
+        text:
+          format: "%.0f%%"
+          args: [ 'x/2.55' ]
+    - script.execute: show_livingroom_leds_brightness
+#--------------------------------------
+- platform: homeassistant
+  id: kitchen_leds_brightness
+  entity_id: light.kitchen_dimmer
+  attribute: brightness
+  unit_of_measurement: "%"
+  state_class: measurement
+  internal: true
+  on_value:
+    - lvgl.label.update:
+        id: kitchen_leds_brightness_label
+        text:
+          format: "%.0f%%"
+          args: [ 'x/2.55' ]
+    - script.execute: show_kitchen_leds_brightness
 #--------------------------------------
 - platform: homeassistant
   id: livingroom_temperature
-  entity_id: sensor.livingroom_enviro_livingroom_enviro_scd30_temperature
+  entity_id: sensor.livingroom_enviro_temperature
   unit_of_measurement: "°F"
   state_class: measurement
   device_class: temperature
@@ -158,7 +192,7 @@ sensor:
 #--------------------------------------
 - platform: homeassistant
   id: livingroom_humidity
-  entity_id: sensor.livingroom_enviro_livingroom_enviro_scd30_humidity
+  entity_id: sensor.livingroom_enviro_humidity
   unit_of_measurement: "%"
   state_class: measurement
   device_class: humidity
@@ -334,7 +368,7 @@ sensor:
   update_interval: 60s
   i2c_id: i2cbus_a
   ambient_light:
-    name: "${friendly_name} Ambient Light"
+    name: "Ambient Light"
     id: clock_amb_light
     unit_of_measurement: "lx"
     state_class: measurement
@@ -385,47 +419,64 @@ sensor:
               value: 100
 #---------------------------------------
   full_spectrum:
-    name: "${friendly_name} White Light"
+    name: "White Light"
     id: clock_white_light
 #---------------------------------------
   infrared:
-    name: "${friendly_name} Infrared Light"
+    name: "Infrared Light"
     id: clock_infred
 #-----------------------------------------------------------------------------
 binary_sensor:
   - platform: remote_receiver
-    name: "Livingroom Plant Lights - 44 Key"
-    id: living_plant_lights_44key
-#   Remote Button 'Quick'
+    name: "Toggle Livingroom Ceiling Fan Light"
+    id: toggle_lvrm_cfl
+#   Remote Button 'Brightness Up'
     internal: true
     on_release:
-      homeassistant.service:
-        service: switch.toggle
-        data:
-          entity_id: switch.plant_light
+      - homeassistant.service:
+          service: light.toggle
+          data: 
+            entity: light.livingroom_fan
+      - script.stop: return_home
+      - script.execute: show_ceilingfan_brightness
     filters:
       - delayed_off: 100ms
     pioneer:
-      rc_code_1: 0x0017
+      rc_code_1: 0x0041
 #---------------------------------------
   - platform: remote_receiver
-    name: "Livingroom Plant Lights"
-    id: living_plant_lights
-#   Remote Button 'B'
+    name: "Inc Livingroom Ceiling Fan Light"
+    id: inc_lvrm_cfl
+#   Remote Button 'Brightness Up'
     internal: true
     on_release:
-      homeassistant.service:
-        service: switch.toggle
-        data:
-          entity_id: switch.plant_light
+      - homeassistant.service:
+          service: script.livingroom_ceiling_fan_light_inc_5_2
+      - script.stop: return_home
+      - script.execute: show_ceilingfan_brightness
     filters:
       - delayed_off: 100ms
     pioneer:
-      rc_code_1: 0x004A
+      rc_code_1: 0x005C
 #---------------------------------------
   - platform: remote_receiver
-    name: "Livingroom Page Turn - 44 Key"
-    id: livingroom_page_turn_44key
+    name: "Dec Livingroom Ceiling Fan Light"
+    id: dec_lvrm_cfl
+#   Remote Button 'Brightness Down'
+    internal: true
+    on_release:
+      - homeassistant.service:
+          service: script.livingroom_ceiling_fan_light_dec_5_2
+      - script.stop: return_home
+      - script.execute: show_ceilingfan_brightness
+    filters:
+      - delayed_off: 100ms
+    pioneer:
+      rc_code_1: 0x005D
+#---------------------------------------
+  - platform: remote_receiver
+    name: "Livingroom Page Turn"
+    id: lvrm_page_turn_44key
 #   Remote Button 'Slow'
     internal: true
     on_press:
@@ -492,13 +543,11 @@ binary_sensor:
 text_sensor:
 - platform: wifi_info
   ip_address:
-    name: ${friendly_name} IP
-    update_interval: 1h
+    name: IP
   ssid:
-    name: ${friendly_name} SSID
-    update_interval: 1h
+    name: SSID
   mac_address:
-    name: ${friendly_name} Mac
+    name: Mac
 #--------------------------------------
 - platform: homeassistant
   id: FullTimeDate
@@ -1229,7 +1278,7 @@ lvgl:
                   outline_color: 0xFF80FF
                   outline_width: $Outlines
 #---------------------------------------------------
-    - id: livingroom_lights_page
+    - id: livingroom_ceilingfan_light_page
       bg_color: 0x000000
       widgets:
         - obj:
@@ -1268,10 +1317,90 @@ lvgl:
                   grid_cell_row_pos: 2
                   text: "Ceiling Fan"
                   styles: header
+#---------------------------------------------------
+    - id: livingroom_leds_light_page
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            align: CENTER
+            width: 790
+            height: 370
+            bg_opa: TRANSP
+            border_opa: TRANSP
+            outline_width: ${Outlines}
+            outline_color: 0xFF0000
+            pad_all: 0
+            x: 0
+            y: 0
+            layout:
+              type: grid
+              grid_columns: [FR(1)]
+              grid_rows: [FR(40),FR(40),FR(20)]
+              pad_column: 0
+              pad_row: 0
+            widgets:
+              - label:
+                  id: livingroom_brightness_leds_header
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 0
+                  text: "Brightness"
+                  styles: page_label_style
+              - label:
+                  id: livingroom_leds_brightness_label
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 1
+                  text: "--%"
+                  styles: page_label_style
+              - label:
+                  id: lbl_livingroom_leds_brightness_id
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 2
+                  text: "Livingroom Lights"
+                  styles: header
+#---------------------------------------------------
+    - id: kitchen_leds_light_page
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            align: CENTER
+            width: 790
+            height: 370
+            bg_opa: TRANSP
+            border_opa: TRANSP
+            outline_width: ${Outlines}
+            outline_color: 0xFF0000
+            pad_all: 0
+            x: 0
+            y: 0
+            layout:
+              type: grid
+              grid_columns: [FR(1)]
+              grid_rows: [FR(40),FR(40),FR(20)]
+              pad_column: 0
+              pad_row: 0
+            widgets:
+              - label:
+                  id: kitchen_brightness_leds_header
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 0
+                  text: "Brightness"
+                  styles: page_label_style
+              - label:
+                  id: kitchen_leds_brightness_label
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 1
+                  text: "--%"
+                  styles: page_label_style
+              - label:
+                  id: lbl_kitchen_leds_brightness_id
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 2
+                  text: "Kitchen Lights"
+                  styles: header
 #---------------------------------------------------------------------------------------------------
 number:
   - platform: template
-    name: ${friendly_name} Lux Threshold
+    name: Lux Threshold
     optimistic: true
     id: clock_display_threshold
     unit_of_measurement: "lx"
@@ -1279,7 +1408,7 @@ number:
     restore_value: true
     min_value: 0.0
     max_value: 1000
-    step: 0.1
+    step: 0.01
     mode: box
 #--------------------------------------------
   - platform: template
@@ -1326,13 +1455,29 @@ script:
 #This script returns to the main_page after 60 seconds of no page flips
   - id: return_home
     then:
-      - delay: 60s
+      - delay: 10s
       - lvgl.page.show: main_page
 #----------------------------------------
-  - id: show_brightness
+  - id: show_ceilingfan_brightness
     then:
       - lvgl.page.show:
-          id: livingroom_lights_page
+          id: livingroom_ceilingfan_light_page
+      - delay: 10s
+      - lvgl.page.show:
+          id: main_page
+#----------------------------------------
+  - id: show_livingroom_leds_brightness
+    then:
+      - lvgl.page.show:
+          id: livingroom_leds_light_page
+      - delay: 10s
+      - lvgl.page.show:
+          id: main_page
+#----------------------------------------
+  - id: show_kitchen_leds_brightness
+    then:
+      - lvgl.page.show:
+          id: kitchen_leds_light_page
       - delay: 10s
       - lvgl.page.show:
           id: main_page
